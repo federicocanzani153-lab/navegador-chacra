@@ -119,7 +119,7 @@ function elegirCampo(i) {
 // ---------- búsqueda de escenas ----------
 async function buscar() {
   const yo = ++corrida, minc = +$('minc').value || 95;
-  escenas = []; pintarFechas(); limpiarOv(); $('tab').innerHTML = '';
+  escenas = []; pintarFechas(); limpiarOv(); $('tab').innerHTML = ''; $('badge').hidden = true;
   const b = lotLay.getBounds(), hoy = new Date(), desde = new Date(hoy - CFG.dias * 864e5);
   est('Buscando imágenes Sentinel-2…');
   const body = { collections: [CFG.col], bbox: [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()],
@@ -299,6 +299,9 @@ function render() {
   if ($('cZon').checked) ov.zon = capa(e, s => e.zon[s] < 0 ? null : ZC[e.zon[s]]).addTo(map);
   if (lotLay && $('cLot').checked) lotLay.bringToFront();
   $('lmin').textContent = e.vmin.toFixed(2); $('lmax').textContent = e.vmax.toFixed(2);
+  const cap = [['cReal', 'Imagen real'], ['cNdvi', 'NDVI'], ['cZon', 'Zonas']].filter(x => $(x[0]).checked).map(x => x[1]);
+  $('badge').innerHTML = `<i></i>${esc(C.nombre)} · ${cap.length ? cap.join(' + ') + ' · ' : ''}${fmt(e.f)}`;
+  $('badge').hidden = false;
 }
 function pintarFechas() {
   $('fechas').innerHTML = escenas.map((e, i) => `<button class="b${i === act ? ' on' : ''}" data-i="${i}">${i ? 'Anterior' : 'Última'} · ${fmt(e.f)}</button>`).join('') || '<small class="n">—</small>';
