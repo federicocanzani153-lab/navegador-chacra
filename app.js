@@ -20,22 +20,12 @@ L.control.layers({ 'Google Satélite': gs, 'Google Híbrido': gh }, null, { posi
 map.setView([-32.5, -56], 7);
 
 // ---------- estado ----------
-let campos = [], C = null, LOT = null, nombres = [], sel = new Set(), lotLay = null, ambLay = null;
+let campos = [], C = null, LOT = null, nombres = [], sel = new Set(), lotLay = null, ambLay = null, ambEtq = null;
 // colores de ambientes: A verde, B amarillo, D rojo; más oscuro en el bajo
-// cada ambiente del campo toma su propio tono dentro de la familia: A verdes, B amarillos/naranjas, D rojos
-const RAMP = { A: ['#c7e9c0', '#a1d99b', '#74c476', '#41ab5d', '#238b45', '#006d2c', '#00441b'], B: ['#fff7bc', '#fee391', '#fec44f', '#fe9929', '#ec7014', '#cc4c02'], D: ['#fcbba1', '#fc9272', '#fb6a4a', '#ef3b2c', '#cb181d', '#99000d'] };
-let ambCol = new Map();
-const colAmb = p => ambCol.get(p.amb) || '#9e9e9e';
-function coloresAmb() {
-  ambCol = new Map();
-  const orden = { l: 0, ml: 1, b: 2 }, grupos = {};
-  for (const f of (C && C.ambientes ? C.ambientes.features : [])) { const p = f.properties; (grupos[p.prod] = grupos[p.prod] || new Map()).set(p.amb, p); }
-  for (const [prod, m] of Object.entries(grupos)) {
-    const r = RAMP[prod] || ['#bdbdbd', '#9e9e9e', '#757575', '#616161'];
-    const ns = [...m.values()].sort((x, y) => (orden[x.clase] ?? 1) - (orden[y.clase] ?? 1) || x.amb.localeCompare(y.amb)).map(p => p.amb);
-    ns.forEach((n, i) => ambCol.set(n, r[ns.length === 1 ? Math.floor(r.length / 2) : Math.round(i * (r.length - 1) / (ns.length - 1))]));
-  }
-}
+// colores de ambientes: A verde, B amarillo, D rojo; tono según relieve (loma claro, bajo oscuro)
+const AC = { A: { l: '#a6d96a', ml: '#66bd63', b: '#1a9850' }, B: { l: '#fff3a3', ml: '#fee08b', b: '#f2c14e' }, D: { l: '#fcae91', ml: '#f46d43', b: '#d73027' } };
+const colAmb = p => (AC[p.prod] || {})[p.clase] || (AC[p.prod] || {}).ml || '#9e9e9e';
+function coloresAmb() {}
 const RELIEVE = { l: 'loma', ml: 'media loma', b: 'bajo' };
 let escenas = [], act = 0, ov = { real: null, ndvi: null, zon: null }, corrida = 0;
 
@@ -316,20 +306,28 @@ function render() {
   if ($('cReal').checked) ov.real = capa(e, s => [e.vis.b[0][s], e.vis.b[1][s], e.vis.b[2][s]]).addTo(map);
   if ($('cNdvi').checked) ov.ndvi = capa(e, (s, k) => isNaN(e.nd[s]) || sinSem(k) ? null : rampa(e.nd[s], e.vmin, e.vmax)).addTo(map);
   if ($('cZon').checked) ov.zon = capa(e, s => e.zon[s] < 0 ? null : ZC[e.zon[s]]).addTo(map);
-  if (ambLay) ambLay.bringToFront();
+  if (ambLay) ambLay.eachLayer(l => l.bringToFront && l.bringToFront());
   if (lotLay && $('cLot').checked) lotLay.bringToFront();
   $('lmin').textContent = e.vmin.toFixed(2); $('lmax').textContent = e.vmax.toFixed(2);
   const cap = [['cReal', 'Imagen real'], ['cNdvi', 'NDVI'], ['cZon', 'Zonas'], ['cAmb', 'Ambientes']].filter(x => $(x[0]).checked).map(x => x[1]);
   $('badge').textContent = `${C.nombre} · ${cap.length ? cap.join(' + ') + ' · ' : ''}${fmt(e.f)}`;
   $('badge').hidden = false;
 }
+function etqZoom() { if (ambEtq) map.getZoom() >= 14 ? ambEtq.addTo(map) : map.removeLayer(ambEtq); }
+map.on('zoomend', etqZoom);
 const estAmb = f => ({ color: 'rgba(255,255,255,.7)', weight: .6, fillColor: colAmb(f.properties), fillOpacity: +$('op').value * .8 });
 function pintarAmb() {
   if (ambLay) { map.removeLayer(ambLay); ambLay = null; }
+  if (ambEtq) { map.removeLayer(ambEtq); ambEtq = null; }
   const on = $('cAmb').checked && C && C.ambientes;
   $('leyA').hidden = !on; if (!on) return;
   const fs = C.ambientes.features.filter(f => sel.has(f.properties.lote));
-  ambLay = L.geoJSON({ type: 'FeatureCollection', features: fs }, { style: estAmb, interactive: false }).addTo(map);
+  ambLay = L.layerGroup().addTo(map);
+  L.geoJSON({ type: 'FeatureCollection', features: fs }, { style: estAmb, interactive: false }).addTo(ambLay);
+  ambEtq = L.layerGroup();
+  for (const f of fs) if (f.properties.lp && f.properties.ha >= 1)
+    L.marker([f.properties.lp[1], f.properties.lp[0]], { interactive: false, icon: L.divIcon({ className: 'etqA', html: esc(f.properties.amb), iconSize: null }) }).addTo(ambEtq);
+  etqZoom();
   const tot = new Map();
   for (const f of fs) { const p = f.properties, t = tot.get(p.amb) || { ha: 0, p }; t.ha += p.ha; tot.set(p.amb, t); }
   $('leyA').innerHTML = [...tot.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([n, t]) => `<span><i style="background:${colAmb(t.p)}"></i>${esc(n)} <em>${t.ha.toFixed(1)} ha</em></span>`).join('');
@@ -342,7 +340,7 @@ function tabla() {
   const h = escenas.map(e => `<th>${fmt(e.f).slice(0, 5)}</th>`).join('') + (escenas.length > 1 ? '<th>Cambio</th>' : '');
   const rows = nombres.map((nm, k) => {
     const ss = C.sinSembrar.includes(nm), v = escenas.map(e => e.stats && !ss ? e.stats[k] : NaN), d = v[0] - v[1];
-    return `<tr><td>${esc(nm)}${ss ? ' <small class="n">s/s</small>' : ''}</td>${v.map(x => `<td>${isNaN(x) ? '–' : x.toFixed(2)}</td>`).join('')}${v.length > 1 ? `<td class="${d < 0 ? 'baj' : 'alt'}">${isNaN(d) ? '–' : (d > 0 ? '+' : '') + d.toFixed(2)}</td>` : ''}</tr>`;
+    return `<tr><td>${esc(nm)}${ss ? ' <small class="n">s/s</small>' : ''}</td>${v.map((x, i) => `<td>${isNaN(x) ? '–' : `<i class="pt" style="background:rgb(${rampa(x, escenas[i].vmin, escenas[i].vmax)})"></i>` + x.toFixed(2)}</td>`).join('')}${v.length > 1 ? `<td class="${d < 0 ? 'baj' : 'alt'}">${isNaN(d) ? '–' : (d > 0 ? '▲ +' : '▼ ') + d.toFixed(2)}</td>` : ''}</tr>`;
   }).join('');
   $('tab').innerHTML = `<table><tr><th>Lote</th>${h}</tr>${rows}</table>`;
 }
@@ -352,7 +350,7 @@ $('campoSel').onchange = () => elegirCampo(+$('campoSel').value);
 $('lots').onclick = ev => { const b = ev.target.closest('[data-p]'); if (!b) return; const p = b.dataset.p; sel.has(p) ? sel.delete(p) : sel.add(p); b.classList.toggle('on', sel.has(p)); render(); };
 $('fechas').onclick = async ev => { const b = ev.target.closest('[data-i]'); if (!b) return; act = +b.dataset.i; pintarFechas(); await procesar(act); render(); };
 ['cReal', 'cNdvi', 'cZon', 'cLot', 'cAmb'].forEach(id => $(id).onchange = render);
-$('op').oninput = () => { for (const k in ov) if (ov[k]) ov[k].setOpacity(+$('op').value); if (ambLay) ambLay.setStyle(estAmb); };
+$('op').oninput = () => { for (const k in ov) if (ov[k]) ov[k].setOpacity(+$('op').value); if (ambLay) ambLay.eachLayer(l => l.setStyle && l.setStyle(estAmb)); };
 $('minb').onclick = () => { $('pan').classList.toggle('min'); $('minb').textContent = $('pan').classList.contains('min') ? '+' : '–'; };
 $('rebus').onclick = () => { act = 0; buscar(); };
 if (window.innerWidth < 600) { $('pan').classList.add('min'); $('minb').textContent = '+'; }
