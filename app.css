@@ -27,6 +27,7 @@ html,body{margin:0;height:100%;font:14px/1.4 system-ui,-apple-system,Segoe UI,Ro
 #rebus{background:var(--v);border-color:var(--v);color:#fff}
 #lots .b{min-height:36px;padding:6px 12px;font-size:12.5px}
 #fechas .b{flex:1 1 140px}
+#indSel .b{flex:1 1 0;min-height:36px}
 
 select{width:100%;font-size:16px;padding:8px;border:1.5px solid var(--v);border-radius:8px;margin:6px 0 10px;background:#fff;color:var(--tx)}
 label.ck{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:14px;cursor:pointer}

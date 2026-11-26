@@ -7,7 +7,7 @@
 <meta name="author" content="Ing. Agr. Federico Canzani">
 <title>Fernando Gonzales · Navegador de chacra</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="../app.css?v=11">
+<link rel="stylesheet" href="../app.css?v=12">
 </head>
 <body>
 <div id="map"></div>
@@ -19,26 +19,28 @@
   <div id="campoBox" hidden><div class="t">Campo</div><select id="campoSel"></select></div>
   <div class="t">Fecha</div>
   <div class="fila" id="fechas"></div>
+  <div class="t">Índice</div>
+  <div class="fila" id="indSel"><button class="b on" data-x="NDVI">NDVI</button><button class="b" data-x="GCI">GCI</button></div>
   <div class="t">Capas</div>
   <label class="ck"><input type="checkbox" id="cReal"> Imagen real</label>
-  <label class="ck"><input type="checkbox" id="cNdvi" checked> NDVI</label>
-  <label class="ck"><input type="checkbox" id="cZon"> Zonas NDVI (3)</label>
+  <label class="ck"><input type="checkbox" id="cNdvi" checked> <span class="nIdx">NDVI</span></label>
+  <label class="ck"><input type="checkbox" id="cZon"> Zonas <span class="nIdx">NDVI</span> (3)</label>
   <label class="ck"><input type="checkbox" id="cAmb"> Ambientes</label>
   <label class="ck"><input type="checkbox" id="cLot" checked> Límites de lotes</label>
   <div class="t">Transparencia</div>
   <input type="range" id="op" min="0.2" max="1" step="0.05" value="0.9">
   <div id="lotsBox"><div class="t">Lotes</div><div class="fila" id="lots"></div></div>
-  <div id="leyN"><div class="leg"></div><div class="legv"><span id="lmin"></span><span>NDVI</span><span id="lmax"></span></div></div>
+  <div id="leyN"><div class="leg"></div><div class="legv"><span id="lmin"></span><span class="nIdx">NDVI</span><span id="lmax"></span></div></div>
   <div class="zl" id="leyZ" hidden><span><i style="background:#2e7d32"></i>Alta</span><span><i style="background:#fdd835"></i>Media</span><span><i style="background:#d7301f"></i>Baja</span></div>
   <div class="al" id="leyA" hidden></div>
-  <div class="t" style="margin-top:10px">NDVI medio por lote</div>
+  <div class="t" style="margin-top:10px"><span class="nIdx">NDVI</span> medio por lote</div>
   <div id="tab"></div>
   <div class="t" style="margin-top:10px">Búsqueda</div>
   <div class="fila" style="align-items:center">
    <span>Mín. sin nubes</span><input id="minc" type="number" min="50" max="100" value="95" style="width:64px;font-size:16px;padding:6px">%
    <button class="b" id="rebus">Buscar</button>
   </div>
-  <small class="n">Sentinel-2 L2A. Muestra las 2 últimas fechas con el % de los lotes sin nubes pedido. Tocá el mapa para ver el NDVI del punto.</small>
+  <small class="n">Sentinel-2 L2A. Muestra las 2 últimas fechas con el % de los lotes sin nubes pedido. GCI = NIR / Verde − 1 (más sensible a clorofila y nitrógeno). Tocá el mapa para ver los valores del punto.</small>
  </div>
 </div>
 <div class="gps"><button id="bGps" title="GPS">📍</button><button id="bCen" title="Centrar en mí" hidden>◎</button></div>
@@ -46,6 +48,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.11.0/proj4.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.js"></script>
-<script src="../app.js?v=11"></script>
+<script src="../app.js?v=12"></script>
 </body>
 </html>

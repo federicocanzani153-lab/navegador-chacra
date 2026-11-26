@@ -27,6 +27,8 @@ const AC = { A: { l: '#a6d96a', ml: '#66bd63', b: '#1a9850' }, B: { l: '#fff3a3'
 const colAmb = p => (AC[p.prod] || {})[p.clase] || (AC[p.prod] || {}).ml || '#9e9e9e';
 function coloresAmb() {}
 const RELIEVE = { l: 'loma', ml: 'media loma', b: 'bajo' };
+let IND = 'NDVI';
+try { if (localStorage.getItem('nav-indice') === 'GCI') IND = 'GCI'; } catch (e) {}
 let escenas = [], act = 0, ov = { real: null, ndvi: null, zon: null }, corrida = 0;
 
 // ---------- utilidades geo ----------
@@ -181,28 +183,34 @@ async function buscar() {
 async function procesar(i, silencio, yo) {
   const e = escenas[i]; if (!e || e.listo) return;
   if (!silencio) est(`Bajando bandas del ${fmt(e.f)}…`);
-  const [red, nir, vis] = await Promise.all([leerMosaico(e.items, 'red', e.bb), leerMosaico(e.items, 'nir', e.bb), leerMosaico(e.items, 'visual', e.bb)]);
+  const [red, nir, grn, vis] = await Promise.all([leerMosaico(e.items, 'red', e.bb), leerMosaico(e.items, 'nir', e.bb), leerMosaico(e.items, 'green', e.bb), leerMosaico(e.items, 'visual', e.bb)]);
   if (yo !== undefined && yo !== corrida) return;
   const rb = k => (e.items[0].assets[k]['raster:bands'] || [{}])[0];
-  const sR = rb('red').scale ?? 1e-4, oR = rb('red').offset ?? 0, sN = rb('nir').scale ?? 1e-4, oN = rb('nir').offset ?? 0;
-  const g = red, n = g.w * g.h, m = mascara(g, e.crs), nd = new Float32Array(n).fill(NaN);
+  const sR = rb('red').scale ?? 1e-4, oR = rb('red').offset ?? 0, sN = rb('nir').scale ?? 1e-4, oN = rb('nir').offset ?? 0, sG = rb('green').scale ?? 1e-4, oG = rb('green').offset ?? 0;
+  const g = red, n = g.w * g.h, m = mascara(g, e.crs), nd = new Float32Array(n).fill(NaN), gc = new Float32Array(n).fill(NaN);
   for (let r = 0; r < g.h; r++) for (let c = 0; c < g.w; c++) {
     const q = r * g.w + c; if (!m[q]) continue;
     const X = g.x0 + (c + .5) * g.rx, Y = g.y0 + (r + .5) * g.ry;
     const sc = Math.floor((X - e.scl.x0) / e.scl.rx), sr = Math.floor((Y - e.scl.y0) / e.scl.ry);
     const s = (sc >= 0 && sr >= 0 && sc < e.scl.w && sr < e.scl.h) ? e.scl.b[0][sr * e.scl.w + sc] : 0;
-    const ra = red.b[0][q], rn = nir.b[0][q];
+    const ra = red.b[0][q], rn = nir.b[0][q], rg = grn.b[0][q];
     if (!ra || !rn || MALO.has(s)) continue;
-    const a = ra * sR + oR, b = rn * sN + oN;
+    const a = ra * sR + oR, b = rn * sN + oN, v = rg * sG + oG;
     if (a + b > 0) nd[q] = (b - a) / (b + a);
+    if (rg && v > 0.005) gc[q] = b / v - 1; // GCI = NIR / Verde - 1
   }
   const sem = nombres.map(x => !C.sinSembrar.includes(x));
-  const vals = []; for (let k = 0; k < n; k++) if (m[k] && sem[m[k] - 1] && !isNaN(nd[k])) vals.push(nd[k]);
-  vals.sort((x, y) => x - y);
-  e.vmin = vals[Math.floor(vals.length * .02)] ?? 0; e.vmax = vals[Math.floor(vals.length * .98)] ?? 1;
-  if (e.vmax - e.vmin < .05) e.vmax = e.vmin + .05;
-  e.g = g; e.m = m; e.nd = nd; e.vis = vis; e.zon = zonas(g, m, nd, sem);
-  e.stats = nombres.map((nm, k) => { let s = 0, c = 0; for (let q = 0; q < n; q++) if (m[q] === k + 1 && !isNaN(nd[q])) { s += nd[q]; c++; } return c ? s / c : NaN; });
+  const indice = (arr, minRango) => {
+    const vals = []; for (let k = 0; k < n; k++) if (m[k] && sem[m[k] - 1] && !isNaN(arr[k])) vals.push(arr[k]);
+    vals.sort((x, y) => x - y);
+    const o = { v: arr, vmin: vals[Math.floor(vals.length * .02)] ?? 0, vmax: vals[Math.floor(vals.length * .98)] ?? 1 };
+    if (o.vmax - o.vmin < minRango) o.vmax = o.vmin + minRango;
+    o.zon = zonas(g, m, arr, sem);
+    o.stats = nombres.map((nm, k) => { let s = 0, c = 0; for (let q = 0; q < n; q++) if (m[q] === k + 1 && !isNaN(arr[q])) { s += arr[q]; c++; } return c ? s / c : NaN; });
+    return o;
+  };
+  e.g = g; e.m = m; e.vis = vis;
+  e.ix = { NDVI: indice(nd, .05), GCI: indice(gc, .3) };
   e.map = remuestreo(g, e.crs);
   e.listo = true;
   if (i === act) render();
@@ -304,12 +312,13 @@ function render() {
   pintarAmb();
   if (!e || !e.listo) { if (lotLay && $('cLot').checked) lotLay.bringToFront(); return; }
   if ($('cReal').checked) ov.real = capa(e, s => [e.vis.b[0][s], e.vis.b[1][s], e.vis.b[2][s]]).addTo(map);
-  if ($('cNdvi').checked) ov.ndvi = capa(e, (s, k) => isNaN(e.nd[s]) || sinSem(k) ? null : rampa(e.nd[s], e.vmin, e.vmax)).addTo(map);
-  if ($('cZon').checked) ov.zon = capa(e, s => e.zon[s] < 0 ? null : ZC[e.zon[s]]).addTo(map);
+  const x = e.ix[IND];
+  if ($('cNdvi').checked) ov.ndvi = capa(e, (s, k) => isNaN(x.v[s]) || sinSem(k) ? null : rampa(x.v[s], x.vmin, x.vmax)).addTo(map);
+  if ($('cZon').checked) ov.zon = capa(e, s => x.zon[s] < 0 ? null : ZC[x.zon[s]]).addTo(map);
   if (ambLay) ambLay.eachLayer(l => l.bringToFront && l.bringToFront());
   if (lotLay && $('cLot').checked) lotLay.bringToFront();
-  $('lmin').textContent = e.vmin.toFixed(2); $('lmax').textContent = e.vmax.toFixed(2);
-  const cap = [['cReal', 'Imagen real'], ['cNdvi', 'NDVI'], ['cZon', 'Zonas'], ['cAmb', 'Ambientes']].filter(x => $(x[0]).checked).map(x => x[1]);
+  $('lmin').textContent = x.vmin.toFixed(2); $('lmax').textContent = x.vmax.toFixed(2);
+  const cap = [['cReal', 'Imagen real'], ['cNdvi', IND], ['cZon', 'Zonas ' + IND], ['cAmb', 'Ambientes']].filter(x => $(x[0]).checked).map(x => x[1]);
   $('badge').textContent = `${C.nombre} · ${cap.length ? cap.join(' + ') + ' · ' : ''}${fmt(e.f)}`;
   $('badge').hidden = false;
 }
@@ -336,11 +345,11 @@ function pintarFechas() {
   $('fechas').innerHTML = escenas.map((e, i) => `<button class="b${i === act ? ' on' : ''}" data-i="${i}">${i ? 'Anterior' : 'Última'} · ${fmt(e.f)}</button>`).join('') || '<small class="n">—</small>';
 }
 function tabla() {
-  if (!escenas.length || !escenas[0].stats) return;
+  if (!escenas.length || !escenas[0].ix) return;
   const h = escenas.map(e => `<th>${fmt(e.f).slice(0, 5)}</th>`).join('') + (escenas.length > 1 ? '<th>Cambio</th>' : '');
   const rows = nombres.map((nm, k) => {
-    const ss = C.sinSembrar.includes(nm), v = escenas.map(e => e.stats && !ss ? e.stats[k] : NaN), d = v[0] - v[1];
-    return `<tr><td>${esc(nm)}${ss ? ' <small class="n">s/s</small>' : ''}</td>${v.map((x, i) => `<td>${isNaN(x) ? '–' : `<i class="pt" style="background:rgb(${rampa(x, escenas[i].vmin, escenas[i].vmax)})"></i>` + x.toFixed(2)}</td>`).join('')}${v.length > 1 ? `<td class="${d < 0 ? 'baj' : 'alt'}">${isNaN(d) ? '–' : (d > 0 ? '▲ +' : '▼ ') + d.toFixed(2)}</td>` : ''}</tr>`;
+    const ss = C.sinSembrar.includes(nm), v = escenas.map(e => e.ix && !ss ? e.ix[IND].stats[k] : NaN), d = v[0] - v[1];
+    return `<tr><td>${esc(nm)}${ss ? ' <small class="n">s/s</small>' : ''}</td>${v.map((x, i) => `<td>${isNaN(x) ? '–' : `<i class="pt" style="background:rgb(${rampa(x, escenas[i].ix[IND].vmin, escenas[i].ix[IND].vmax)})"></i>` + x.toFixed(2)}</td>`).join('')}${v.length > 1 ? `<td class="${d < 0 ? 'baj' : 'alt'}">${isNaN(d) ? '–' : (d > 0 ? '▲ +' : '▼ ') + d.toFixed(2)}</td>` : ''}</tr>`;
   }).join('');
   $('tab').innerHTML = `<table><tr><th>Lote</th>${h}</tr>${rows}</table>`;
 }
@@ -350,6 +359,12 @@ $('campoSel').onchange = () => elegirCampo(+$('campoSel').value);
 $('lots').onclick = ev => { const b = ev.target.closest('[data-p]'); if (!b) return; const p = b.dataset.p; sel.has(p) ? sel.delete(p) : sel.add(p); b.classList.toggle('on', sel.has(p)); render(); };
 $('fechas').onclick = async ev => { const b = ev.target.closest('[data-i]'); if (!b) return; act = +b.dataset.i; pintarFechas(); await procesar(act); render(); };
 ['cReal', 'cNdvi', 'cZon', 'cLot', 'cAmb'].forEach(id => $(id).onchange = render);
+function pintarIndice() {
+  document.querySelectorAll('#indSel [data-x]').forEach(b => b.classList.toggle('on', b.dataset.x === IND));
+  document.querySelectorAll('.nIdx').forEach(el => el.textContent = IND);
+}
+$('indSel').onclick = ev => { const b = ev.target.closest('[data-x]'); if (!b) return; IND = b.dataset.x; try { localStorage.setItem('nav-indice', IND); } catch (e) {} pintarIndice(); render(); tabla(); };
+pintarIndice();
 $('op').oninput = () => { for (const k in ov) if (ov[k]) ov[k].setOpacity(+$('op').value); if (ambLay) ambLay.eachLayer(l => l.setStyle && l.setStyle(estAmb)); };
 $('minb').onclick = () => { $('pan').classList.toggle('min'); $('minb').textContent = $('pan').classList.contains('min') ? '+' : '–'; };
 $('rebus').onclick = () => { act = 0; buscar(); };
@@ -384,8 +399,8 @@ map.on('click', ev => {
     const [X, Y] = proj4('EPSG:4326', e.crs, pt);
     const c = Math.floor((X - e.g.x0) / e.g.rx), r = Math.floor((Y - e.g.y0) / e.g.ry);
     if (c >= 0 && r >= 0 && c < e.g.w && r < e.g.h) {
-      const s = r * e.g.w + c, v = e.nd[s], z = e.zon[s];
-      h += `<br>${fmt(e.f)} · ${sinSem(k) ? 'Sin sembrar' : 'NDVI: <b>' + (isNaN(v) ? 'nube/sin dato' : v.toFixed(2)) + '</b>'}${z >= 0 ? '<br>Zona: ' + ZN[z] : ''}`;
+      const s = r * e.g.w + c, vn = e.ix.NDVI.v[s], vg = e.ix.GCI.v[s], z = e.ix[IND].zon[s];
+      h += `<br>${fmt(e.f)} · ${sinSem(k) ? 'Sin sembrar' : isNaN(vn) ? 'nube/sin dato' : 'NDVI: <b>' + vn.toFixed(2) + '</b> · GCI: <b>' + (isNaN(vg) ? '–' : vg.toFixed(2)) + '</b>'}${z >= 0 ? '<br>Zona ' + IND + ': ' + ZN[z] : ''}`;
     }
   }
   L.popup().setLatLng(ev.latlng).setContent(h + `<br><small>${ev.latlng.lat.toFixed(6)}, ${ev.latlng.lng.toFixed(6)}</small>`).openOn(map);
