@@ -93,7 +93,7 @@ L.control.zoom({ position: 'bottomleft' }).addTo(map);
 const gs = L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { subdomains: '0123', maxZoom: 21, attribution: 'Google' }).addTo(map);
 const gh = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { subdomains: '0123', maxZoom: 21, attribution: 'Google' });
 L.control.layers({ 'Google Satélite': gs, 'Google Híbrido': gh }, null, { position: 'topright' }).addTo(map);
-const pivLay = L.geoJSON(PIV, { style: { color: '#fff', weight: 2.5, fill: false } }).addTo(map);
+const pivLay = L.geoJSON(PIV, { style: { color: '#fff', weight: 1.2, opacity: 0.9, fill: false } }).addTo(map);
 pivLay.eachLayer(l => l.bindTooltip(l.feature.properties.nombre, { permanent: true, direction: 'center', className: 'lbl' }));
 map.fitBounds(pivLay.getBounds(), { padding: [20, 20] });
 const nombres = PIV.features.map(f => f.properties.nombre);
