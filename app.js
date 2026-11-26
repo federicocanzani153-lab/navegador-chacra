@@ -1,4 +1,4 @@
-// Navegador de chacra · Pronutrition
+// Navegador de chacra
 // Lotes del cliente + Sentinel-2 L2A (Earth Search, público): imagen real, NDVI y zonas de las 2 últimas fechas sin nubes.
 {
 const NAV = window.NAV || { datos: [] };

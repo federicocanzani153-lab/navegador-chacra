@@ -1,4 +1,4 @@
-# Navegador de chacra · Pronutrition
+# Navegador de chacra
 
 Mapas de lotes por cliente con Google Satélite, imagen real, NDVI y zonas de NDVI (Sentinel-2, 2 últimas fechas sin nubes) y GPS.
 

@@ -1,11 +1,10 @@
-:root{--v:#2e7d32;--v2:#81c784;--tx:#1b1b1b}
+:root{--v:#1565c0;--v2:#64b5f6;--tx:#1b1b1b}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--tx)}
 #map{position:fixed;inset:0;background:#111}
 .pan{position:fixed;z-index:1000;left:10px;top:10px;width:min(340px,calc(100vw - 20px));max-height:calc(100vh - 20px);overflow:auto;
  background:#fff;border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.35)}
 .pan header{background:var(--v);color:#fff;padding:8px 10px;border-radius:12px 12px 0 0;display:flex;align-items:center;gap:10px}
-.pan header img{height:34px;background:#fff;border-radius:6px;padding:2px 4px}
 .pan header .tit{flex:1;min-width:0}
 .pan header b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pan header small{display:block;font-size:11px;opacity:.85}
@@ -26,11 +25,11 @@ label.ck input{width:20px;height:20px;accent-color:var(--v)}
 table{border-collapse:collapse;width:100%;font-size:12px;margin-top:4px}
 th,td{padding:4px;text-align:right;border-bottom:1px solid #e3e3e3}th:first-child,td:first-child{text-align:left}
 th{color:var(--v)}
-.baj{color:#c62828}.alt{color:#2e7d32}
+.baj{color:#c62828}.alt{color:#1565c0}
 input[type=range]{width:100%;accent-color:var(--v)}
 .gps{position:fixed;z-index:1000;right:12px;bottom:24px;display:flex;flex-direction:column;gap:8px}
 .gps button{width:54px;height:54px;border-radius:50%;border:0;background:#fff;box-shadow:0 3px 10px rgba(0,0,0,.4);font-size:22px;cursor:pointer}
-.gps button.on{background:#1565c0;color:#fff}
+.gps button.on{background:#0d47a1;color:#fff}
 .pix{image-rendering:pixelated}
 .lbl{background:none;border:0;box-shadow:none;color:#fff;font-weight:800;font-size:13px;text-shadow:0 0 3px #000,0 0 3px #000}
 .lbl::before{display:none}
