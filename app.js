@@ -326,7 +326,7 @@ function pintarAmb() {
   L.geoJSON({ type: 'FeatureCollection', features: fs }, { style: estAmb, interactive: false }).addTo(ambLay);
   ambEtq = L.layerGroup();
   for (const f of fs) if (f.properties.lp && f.properties.ha >= 1)
-    L.marker([f.properties.lp[1], f.properties.lp[0]], { interactive: false, icon: L.divIcon({ className: 'etqA', html: esc(f.properties.amb), iconSize: null }) }).addTo(ambEtq);
+    L.marker([f.properties.lp[1], f.properties.lp[0]], { interactive: false, icon: L.divIcon({ className: 'etqA', html: '<span>' + esc(f.properties.amb) + '</span>', iconSize: [0, 0] }) }).addTo(ambEtq);
   etqZoom();
   const tot = new Map();
   for (const f of fs) { const p = f.properties, t = tot.get(p.amb) || { ha: 0, p }; t.ha += p.ha; tot.set(p.amb, t); }

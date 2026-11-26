@@ -61,5 +61,6 @@ tr:hover td{background:#f5f9fd}
 .lbl::before{display:none}
 small.n{color:var(--mu);font-size:11px}
 [hidden]{display:none!important}
-.etqA{background:rgba(255,255,255,.85);color:#1b1b1b;font-size:11px;font-weight:700;padding:1px 6px;border-radius:6px;white-space:nowrap;
- box-shadow:0 1px 3px rgba(0,0,0,.35);transform:translate(-50%,-50%);pointer-events:none}
+.etqA{width:0!important;height:0!important;pointer-events:none}
+.etqA span{position:absolute;left:0;top:0;transform:translate(-50%,-50%);background:rgba(255,255,255,.85);color:#1b1b1b;font-size:11px;font-weight:700;
+ padding:1px 6px;border-radius:6px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.35)}
