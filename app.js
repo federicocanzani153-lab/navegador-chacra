@@ -48,7 +48,14 @@ function bboxUTM(crs, pad) {
 }
 const pool = (typeof Worker !== 'undefined') ? new GeoTIFF.Pool() : undefined;
 async function leer(href, bb) {
-  const tif = await GeoTIFF.fromUrl(href, { allowFullFile: false });
+  // reintenta: algunos navegadores cortan pedidos parciales simultáneos (ERR_CACHE_OPERATION_NOT_SUPPORTED)
+  for (let i = 0; ; i++) {
+    try { return await leer1(href, bb); }
+    catch (e) { if (i >= 3) throw e; await new Promise(r => setTimeout(r, 400 * (i + 1))); }
+  }
+}
+async function leer1(href, bb) {
+  const tif = await GeoTIFF.fromUrl(href + (href.includes('?') ? '&' : '?') + 'n=' + Math.random().toString(36).slice(2, 7), { allowFullFile: false });
   const img = await tif.getImage();
   const [ox, oy] = img.getOrigin(), [rx, ry] = img.getResolution();
   const c0 = Math.floor((bb[0] - ox) / rx), c1 = Math.ceil((bb[2] - ox) / rx), r0 = Math.floor((bb[3] - oy) / ry), r1 = Math.ceil((bb[1] - oy) / ry);
@@ -183,7 +190,8 @@ async function buscar() {
 async function procesar(i, silencio, yo) {
   const e = escenas[i]; if (!e || e.listo) return;
   if (!silencio) est(`Bajando bandas del ${fmt(e.f)}…`);
-  const [red, nir, grn, vis] = await Promise.all([leerMosaico(e.items, 'red', e.bb), leerMosaico(e.items, 'nir', e.bb), leerMosaico(e.items, 'green', e.bb), leerMosaico(e.items, 'visual', e.bb)]);
+  const red = await leerMosaico(e.items, 'red', e.bb), nir = await leerMosaico(e.items, 'nir', e.bb);
+  const grn = await leerMosaico(e.items, 'green', e.bb), vis = await leerMosaico(e.items, 'visual', e.bb);
   if (yo !== undefined && yo !== corrida) return;
   const rb = k => (e.items[0].assets[k]['raster:bands'] || [{}])[0];
   const sR = rb('red').scale ?? 1e-4, oR = rb('red').offset ?? 0, sN = rb('nir').scale ?? 1e-4, oN = rb('nir').offset ?? 0, sG = rb('green').scale ?? 1e-4, oG = rb('green').offset ?? 0;
