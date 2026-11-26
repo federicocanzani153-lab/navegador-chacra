@@ -8,6 +8,7 @@ html,body{margin:0;height:100%;font:14px/1.4 system-ui,-apple-system,Segoe UI,Ro
 .pan header .tit{flex:1;min-width:0}
 .pan header b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pan header small{display:block;font-size:11px;opacity:.85}
+.pan header small.firma{font-size:10.5px;opacity:.75;font-style:italic}
 .pan header button{background:none;border:0;color:#fff;font-size:22px;width:40px;height:40px;cursor:pointer}
 .pan.min .cuerpo{display:none}
 .cuerpo{padding:10px 12px}
