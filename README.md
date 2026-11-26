@@ -1,5 +1,7 @@
-# Navegador de chacra · Reserva
+# Navegador de chacra · Pronutrition
 
-Mapa de los pivots con Google Satélite, imagen real, NDVI y zonas de NDVI (Sentinel-2, últimas 2 fechas sin nubes) y GPS.
+Mapas de lotes por cliente con Google Satélite, imagen real, NDVI y zonas de NDVI (Sentinel-2, 2 últimas fechas sin nubes) y GPS.
 
-Página: https://federicocanzani153-lab.github.io/navegador-chacra/
+- `app.js` / `app.css`: código compartido
+- `data/<cliente>.json`: lotes de cada cliente
+- una carpeta por link (cliente o general)
