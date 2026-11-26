@@ -170,21 +170,28 @@ async function buscar() {
   for (const it of items) {
     if ((it.properties['eo:cloud_cover'] ?? 0) > 98) continue;
     const f = it.properties.datetime.slice(0, 10);
-    if (!porFecha.has(f) || it.properties['eo:cloud_cover'] < porFecha.get(f).properties['eo:cloud_cover']) porFecha.set(f, it);
+    if (!porFecha.has(f)) porFecha.set(f, []);
+    porFecha.get(f).push(it);
   }
   const fechas = [...porFecha.keys()].sort().reverse();
   let rev = 0;
   for (const f of fechas) {
     if (escenas.length >= CFG.maxFechas) break;
     rev++; est(`Revisando nubes ${fmt(f)} (${rev}/${fechas.length})…`);
-    try {
-      const it = porFecha.get(f), crs = defUTM(epsgDe(it)), bb = bboxUTM(crs, 60);
-      const scl = await leer(it.assets.scl.href, bb), m = mascara(scl, crs);
-      let tot = 0, ok = 0;
-      for (let i = 0; i < m.length; i++) if (m[i]) { tot++; if (!MALO.has(scl.b[0][i])) ok++; }
-      const pct = 100 * ok / tot;
-      if (pct >= minc) { escenas.push({ f, it, crs, bb, pct, scl }); pintarFechas(); if (escenas.length === 1) await procesar(0); }
-    } catch (e) { console.warn(f, e); }
+    // puede haber más de una versión de la misma fecha (escenas recortadas): se queda con la más completa
+    let mejor = null;
+    for (const it of porFecha.get(f)) {
+      try {
+        const crs = defUTM(epsgDe(it)), bb = bboxUTM(crs, 60);
+        const scl = await leer(it.assets.scl.href, bb), m = mascara(scl, crs);
+        let tot = 0, ok = 0;
+        for (let i = 0; i < m.length; i++) if (m[i]) { tot++; if (!MALO.has(scl.b[0][i])) ok++; }
+        const pct = 100 * ok / tot;
+        if (!mejor || pct > mejor.pct) mejor = { f, it, crs, bb, pct, scl };
+        if (pct >= 99.9) break;
+      } catch (e) { console.warn(f, e); }
+    }
+    if (mejor && mejor.pct >= minc) { escenas.push(mejor); pintarFechas(); if (escenas.length === 1) await procesar(0); }
   }
   if (!escenas.length) { est(`Ninguna fecha de los últimos ${CFG.dias} días llega a ${minc}% sin nubes. Bajá el %.`); return; }
   for (let i = 1; i < escenas.length; i++) await procesar(i, true);
