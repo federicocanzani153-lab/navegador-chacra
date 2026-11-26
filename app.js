@@ -22,8 +22,20 @@ map.setView([-32.5, -56], 7);
 // ---------- estado ----------
 let campos = [], C = null, LOT = null, nombres = [], sel = new Set(), lotLay = null, ambLay = null;
 // colores de ambientes: A verde, B amarillo, D rojo; más oscuro en el bajo
-const AC = { A: { l: '#a6d96a', ml: '#66bd63', b: '#1a9850' }, B: { l: '#fff3a3', ml: '#fee08b', b: '#f2c14e' }, D: { l: '#fcae91', ml: '#f46d43', b: '#c62828' } };
-const colAmb = p => (AC[p.prod] || {})[p.clase] || (AC[p.prod] || {}).ml || '#9e9e9e';
+// cada ambiente del campo toma su propio tono dentro de la familia: A verdes, B amarillos/naranjas, D rojos
+const RAMP = { A: ['#c7e9c0', '#a1d99b', '#74c476', '#41ab5d', '#238b45', '#006d2c', '#00441b'], B: ['#fff7bc', '#fee391', '#fec44f', '#fe9929', '#ec7014', '#cc4c02'], D: ['#fcbba1', '#fc9272', '#fb6a4a', '#ef3b2c', '#cb181d', '#99000d'] };
+let ambCol = new Map();
+const colAmb = p => ambCol.get(p.amb) || '#9e9e9e';
+function coloresAmb() {
+  ambCol = new Map();
+  const orden = { l: 0, ml: 1, b: 2 }, grupos = {};
+  for (const f of (C && C.ambientes ? C.ambientes.features : [])) { const p = f.properties; (grupos[p.prod] = grupos[p.prod] || new Map()).set(p.amb, p); }
+  for (const [prod, m] of Object.entries(grupos)) {
+    const r = RAMP[prod] || ['#bdbdbd', '#9e9e9e', '#757575', '#616161'];
+    const ns = [...m.values()].sort((x, y) => (orden[x.clase] ?? 1) - (orden[y.clase] ?? 1) || x.amb.localeCompare(y.amb)).map(p => p.amb);
+    ns.forEach((n, i) => ambCol.set(n, r[ns.length === 1 ? Math.floor(r.length / 2) : Math.round(i * (r.length - 1) / (ns.length - 1))]));
+  }
+}
 const RELIEVE = { l: 'loma', ml: 'media loma', b: 'bajo' };
 let escenas = [], act = 0, ov = { real: null, ndvi: null, zon: null }, corrida = 0;
 
@@ -113,6 +125,7 @@ function elegirCampo(i) {
   $('tit').textContent = C.nombre;
   if (lotLay) map.removeLayer(lotLay);
   if (ambLay) { map.removeLayer(ambLay); ambLay = null; }
+  coloresAmb();
   lotLay = L.geoJSON(LOT, { style: { color: '#fff', weight: 1.2, opacity: .9, fill: false } }).addTo(map);
   lotLay.eachLayer(l => l.bindTooltip(esc(l.feature.properties.nombre), { permanent: true, direction: 'center', className: 'lbl' }));
   map.fitBounds(lotLay.getBounds(), { padding: [20, 20] });
