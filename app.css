@@ -57,7 +57,7 @@ tr:last-child td{border-bottom:0}
 .badge{position:fixed;z-index:999;left:50%;top:14px;transform:translateX(-50%);background:rgba(11,37,69,.85);color:#fff;
  padding:7px 14px;border-radius:999px;font-size:13px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.3);white-space:nowrap;pointer-events:none}
 .badge i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ac2);margin-right:7px;vertical-align:1px}
-@media (max-width:600px){.badge{top:auto;bottom:26px;left:14px;transform:none;font-size:12px}}
+@media (max-width:600px){.badge{top:auto;bottom:34px;font-size:12px;max-width:calc(100vw - 150px);overflow:hidden;text-overflow:ellipsis}}
 
 .pix{image-rendering:pixelated}
 .lbl{background:none;border:0;box-shadow:none;color:#fff;font-weight:800;font-size:13px;text-shadow:0 0 3px #000,0 0 3px #000}
