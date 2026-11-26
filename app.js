@@ -20,7 +20,11 @@ L.control.layers({ 'Google Satélite': gs, 'Google Híbrido': gh }, null, { posi
 map.setView([-32.5, -56], 7);
 
 // ---------- estado ----------
-let campos = [], C = null, LOT = null, nombres = [], sel = new Set(), lotLay = null;
+let campos = [], C = null, LOT = null, nombres = [], sel = new Set(), lotLay = null, ambLay = null;
+// colores de ambientes: A verde, B amarillo, D rojo; más oscuro en el bajo
+const AC = { A: { l: '#a6d96a', ml: '#66bd63', b: '#1a9850' }, B: { l: '#fff3a3', ml: '#fee08b', b: '#f2c14e' }, D: { l: '#fcae91', ml: '#f46d43', b: '#c62828' } };
+const colAmb = p => (AC[p.prod] || {})[p.clase] || (AC[p.prod] || {}).ml || '#9e9e9e';
+const RELIEVE = { l: 'loma', ml: 'media loma', b: 'bajo' };
 let escenas = [], act = 0, ov = { real: null, ndvi: null, zon: null }, corrida = 0;
 
 // ---------- utilidades geo ----------
@@ -108,6 +112,7 @@ function elegirCampo(i) {
   try { localStorage.setItem('nav-campo-' + location.pathname, i); } catch (e) {}
   $('tit').textContent = C.nombre;
   if (lotLay) map.removeLayer(lotLay);
+  if (ambLay) { map.removeLayer(ambLay); ambLay = null; }
   lotLay = L.geoJSON(LOT, { style: { color: '#fff', weight: 1.2, opacity: .9, fill: false } }).addTo(map);
   lotLay.eachLayer(l => l.bindTooltip(esc(l.feature.properties.nombre), { permanent: true, direction: 'center', className: 'lbl' }));
   map.fitBounds(lotLay.getBounds(), { padding: [20, 20] });
@@ -293,15 +298,28 @@ function render() {
   limpiarOv(); const e = escenas[act];
   $('leyN').hidden = !$('cNdvi').checked; $('leyZ').hidden = !$('cZon').checked;
   if (lotLay) { $('cLot').checked ? lotLay.addTo(map) : map.removeLayer(lotLay); }
-  if (!e || !e.listo) return;
+  pintarAmb();
+  if (!e || !e.listo) { if (lotLay && $('cLot').checked) lotLay.bringToFront(); return; }
   if ($('cReal').checked) ov.real = capa(e, s => [e.vis.b[0][s], e.vis.b[1][s], e.vis.b[2][s]]).addTo(map);
   if ($('cNdvi').checked) ov.ndvi = capa(e, (s, k) => isNaN(e.nd[s]) || sinSem(k) ? null : rampa(e.nd[s], e.vmin, e.vmax)).addTo(map);
   if ($('cZon').checked) ov.zon = capa(e, s => e.zon[s] < 0 ? null : ZC[e.zon[s]]).addTo(map);
+  if (ambLay) ambLay.bringToFront();
   if (lotLay && $('cLot').checked) lotLay.bringToFront();
   $('lmin').textContent = e.vmin.toFixed(2); $('lmax').textContent = e.vmax.toFixed(2);
-  const cap = [['cReal', 'Imagen real'], ['cNdvi', 'NDVI'], ['cZon', 'Zonas']].filter(x => $(x[0]).checked).map(x => x[1]);
-  $('badge').innerHTML = `<i></i>${esc(C.nombre)} · ${cap.length ? cap.join(' + ') + ' · ' : ''}${fmt(e.f)}`;
+  const cap = [['cReal', 'Imagen real'], ['cNdvi', 'NDVI'], ['cZon', 'Zonas'], ['cAmb', 'Ambientes']].filter(x => $(x[0]).checked).map(x => x[1]);
+  $('badge').textContent = `${C.nombre} · ${cap.length ? cap.join(' + ') + ' · ' : ''}${fmt(e.f)}`;
   $('badge').hidden = false;
+}
+const estAmb = f => ({ color: 'rgba(255,255,255,.7)', weight: .6, fillColor: colAmb(f.properties), fillOpacity: +$('op').value * .8 });
+function pintarAmb() {
+  if (ambLay) { map.removeLayer(ambLay); ambLay = null; }
+  const on = $('cAmb').checked && C && C.ambientes;
+  $('leyA').hidden = !on; if (!on) return;
+  const fs = C.ambientes.features.filter(f => sel.has(f.properties.lote));
+  ambLay = L.geoJSON({ type: 'FeatureCollection', features: fs }, { style: estAmb, interactive: false }).addTo(map);
+  const tot = new Map();
+  for (const f of fs) { const p = f.properties, t = tot.get(p.amb) || { ha: 0, p }; t.ha += p.ha; tot.set(p.amb, t); }
+  $('leyA').innerHTML = [...tot.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([n, t]) => `<span><i style="background:${colAmb(t.p)}"></i>${esc(n)} <em>${t.ha.toFixed(1)} ha</em></span>`).join('');
 }
 function pintarFechas() {
   $('fechas').innerHTML = escenas.map((e, i) => `<button class="b${i === act ? ' on' : ''}" data-i="${i}">${i ? 'Anterior' : 'Última'} · ${fmt(e.f)}</button>`).join('') || '<small class="n">—</small>';
@@ -320,20 +338,46 @@ function tabla() {
 $('campoSel').onchange = () => elegirCampo(+$('campoSel').value);
 $('lots').onclick = ev => { const b = ev.target.closest('[data-p]'); if (!b) return; const p = b.dataset.p; sel.has(p) ? sel.delete(p) : sel.add(p); b.classList.toggle('on', sel.has(p)); render(); };
 $('fechas').onclick = async ev => { const b = ev.target.closest('[data-i]'); if (!b) return; act = +b.dataset.i; pintarFechas(); await procesar(act); render(); };
-['cReal', 'cNdvi', 'cZon', 'cLot'].forEach(id => $(id).onchange = render);
-$('op').oninput = () => { for (const k in ov) if (ov[k]) ov[k].setOpacity(+$('op').value); };
+['cReal', 'cNdvi', 'cZon', 'cLot', 'cAmb'].forEach(id => $(id).onchange = render);
+$('op').oninput = () => { for (const k in ov) if (ov[k]) ov[k].setOpacity(+$('op').value); if (ambLay) ambLay.setStyle(estAmb); };
 $('minb').onclick = () => { $('pan').classList.toggle('min'); $('minb').textContent = $('pan').classList.contains('min') ? '+' : '–'; };
 $('rebus').onclick = () => { act = 0; buscar(); };
 if (window.innerWidth < 600) { $('pan').classList.add('min'); $('minb').textContent = '+'; }
 
+function dentro(pt, f) {
+  let ok = false;
+  for (const p of polys(f)) {
+    let inP = false;
+    p.forEach((ring, ri) => {
+      let c = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [xi, yi] = ring[i], [xj, yj] = ring[j];
+        if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) c = !c;
+      }
+      if (ri === 0) inP = c; else if (c) inP = false;
+    });
+    if (inP) ok = true;
+  }
+  return ok;
+}
 map.on('click', ev => {
-  const e = escenas[act]; if (!e || !e.listo) return;
-  const [X, Y] = proj4('EPSG:4326', e.crs, [ev.latlng.lng, ev.latlng.lat]);
-  const c = Math.floor((X - e.g.x0) / e.g.rx), r = Math.floor((Y - e.g.y0) / e.g.ry);
-  if (c < 0 || r < 0 || c >= e.g.w || r >= e.g.h) return;
-  const s = r * e.g.w + c, k = e.m[s]; if (!k) return;
-  const ss = sinSem(k), v = e.nd[s], z = e.zon[s];
-  L.popup().setLatLng(ev.latlng).setContent(`<b>${esc(nombres[k - 1])}</b> · ${fmt(e.f)}<br>${ss ? 'Sin sembrar' : 'NDVI: <b>' + (isNaN(v) ? 'nube/sin dato' : v.toFixed(2)) + '</b>'}${z >= 0 ? '<br>Zona: ' + ZN[z] : ''}<br><small>${ev.latlng.lat.toFixed(6)}, ${ev.latlng.lng.toFixed(6)}</small>`).openOn(map);
+  if (!C) return;
+  const pt = [ev.latlng.lng, ev.latlng.lat];
+  const lot = LOT.features.find(f => dentro(pt, f)); if (!lot) return;
+  const nm = lot.properties.nombre, k = nombres.indexOf(nm) + 1;
+  let h = `<b>${esc(nm)}</b>`;
+  const am = (C.ambientes ? C.ambientes.features : []).find(f => f.properties.lote === nm && dentro(pt, f));
+  if (am) h += `<br>Ambiente: <b>${esc(am.properties.amb)}</b>${RELIEVE[am.properties.clase] ? ' (' + RELIEVE[am.properties.clase] + ')' : ''}`;
+  const e = escenas[act];
+  if (e && e.listo) {
+    const [X, Y] = proj4('EPSG:4326', e.crs, pt);
+    const c = Math.floor((X - e.g.x0) / e.g.rx), r = Math.floor((Y - e.g.y0) / e.g.ry);
+    if (c >= 0 && r >= 0 && c < e.g.w && r < e.g.h) {
+      const s = r * e.g.w + c, v = e.nd[s], z = e.zon[s];
+      h += `<br>${fmt(e.f)} · ${sinSem(k) ? 'Sin sembrar' : 'NDVI: <b>' + (isNaN(v) ? 'nube/sin dato' : v.toFixed(2)) + '</b>'}${z >= 0 ? '<br>Zona: ' + ZN[z] : ''}`;
+    }
+  }
+  L.popup().setLatLng(ev.latlng).setContent(h + `<br><small>${ev.latlng.lat.toFixed(6)}, ${ev.latlng.lng.toFixed(6)}</small>`).openOn(map);
 });
 
 // ---------- GPS ----------
